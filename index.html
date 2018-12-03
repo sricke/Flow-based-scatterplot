@@ -1,0 +1,820 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <script src="https://d3js.org/d3.v5.js"></script>
+    <script src="https://d3js.org/d3-selection-multi.v1.min.js"></script>
+    <script src="derivadas.js"></script>
+    <script src="https://unpkg.com/d3-simple-slider/build/d3-simple-slider.js"></script>
+
+    <title>Scatterplot Streamlines</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="css/logo-nav.css" rel="stylesheet">
+
+  </head>
+  <style>
+  p {
+    margin: 25px;
+}
+</style>
+
+  <body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+      <div class="container">
+        <a class="navbar-brand" href="#">
+          <img src="resources/logo.png" width="150" height="50" alt="">
+        </a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarResponsive">
+          <ul class="navbar-nav ml-auto">
+            <li class="nav-item active">
+              <a class="nav-link" href="#">Visualization
+                <span class="sr-only">(current)</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#">Explanation</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#">About</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#">Contact</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Page Content -->
+    <div class="container">
+      <div class="row">
+        <div class="col-6 justify-content-md-center" id="content">
+        </div>
+        <div class="col-6" id = "inputs">
+
+          <br>
+          <button type="button" class="btn btn-outline-info" onclick= "cambiarlineas()">Toggle Lines</button>
+          <div class="input-group mb-3">
+            <div class="input-group-prepend">
+              <label class="input-group-text" for="xSelect">X</label>
+            </div>
+            <select class="custom-select" id="xSelect">
+            </select>
+          </div>
+
+          <div class="input-group mb-3">
+            <div class="input-group-prepend">
+              <label class="input-group-text" for="ySelect">Y</label>
+            </div>
+            <select class="custom-select" id="ySelect">
+            </select>
+          </div>
+
+          <div class="input-group mb-3">
+            <div class="input-group-prepend">
+              <label class="input-group-text" for="dSelect">Derivative X</label>
+            </div>
+            <select class="custom-select" id="dSelect">
+            </select>
+          </div>
+
+          <div class="input-group mb-3">
+            <div class="input-group-prepend">
+              <label class="input-group-text" for="cSelect">Categorical</label>
+            </div>
+            <select class="custom-select" id="cSelect">
+            </select>
+          </div>
+          <p> Select Radius: <p>
+          <div id = "slider"></div>
+
+        </div>
+      </div>
+    </div>
+    <script>
+var margin = {top: 30, bottom: 30, left: 50, right:30},
+    width = 600 - margin.left - margin.right,
+    height = 600 - margin.top - margin.bottom,
+    transitionDuration = 1000,
+    svg = d3.select("#content").append("svg")
+
+                    .attr("height", height + margin.top + margin.bottom)
+                    .attr("width", width + margin.left + margin.right + 150)
+                    .append("g")
+                        .attr("transform", "translate(" + margin.left + "," + margin.top + ")"),
+    color = 0,
+    xScale = d3.scaleLinear()
+                .range([0, 600 - margin.left - margin.right]),
+    yScale = d3.scaleLinear()
+                .range([height, 0]),
+    xGen = d3.axisBottom(xScale)
+                .ticks(7),
+    yGen = d3.axisLeft(yScale)
+                .ticks(7),
+    xAxis = svg.append("g")
+                .attr("class", "x-axis")
+                .attr("transform", "translate(0," + height + ")")
+                .call(xGen),
+    yAxis = svg.append("g")
+                .attr("class", "y-axis")
+                .call(yGen),
+  Ylabel = svg.append("text")
+        .attr("class", "label-y")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - margin.left)
+        .attr("x",0 - (height / 2))
+        .attr("dy", "1em")
+        .attr("style", "font-size: 20")
+        .style("text-anchor", "middle")
+        .text("Cholestoral (mg/dl)"),
+  Xlabel = svg.append("text")
+          .attr("class", "label-x")
+          .attr("transform",
+                "translate(" + (width/2) + " ," +
+                               (height + margin.top) + ")")
+          .attr("style", "font-size: 20")
+          .style("text-anchor", "middle")
+          .text("Age (Years)"),
+    colors = d3.scaleOrdinal(d3.schemeCategory10),
+    tooltip = d3.select("body").append("div")
+                .style("position", "absolute")
+                .attr("class", "tooltip")
+                .style("left", "50px")
+                .style("top", "50px")
+                .style("opacity", 0),
+  legendw = 600 - margin.left - margin.right + 30
+    legendh = height*2/3 + 10
+  Lcircle1 = svg.append("circle")
+              .attr("class","clegend0")
+              .attr("r", 4)
+              .attr("transform",
+                  "translate(" + (legendw-5) + " ," +
+                                 (legendh + 15) + ")")
+                            .attr('stroke','black')
+                            .attr('stroke-width',0)
+                            .attr("fill", colors(0))
+    Lcircle2 = svg.append("circle")
+                .attr("class","clegend1")
+              .attr("r", 4)
+              .attr("transform",
+                  "translate(" + (legendw-5) + " ," +
+                                 (legendh + 30) + ")")
+                            .attr('stroke','black')
+                            .attr('stroke-width',0)
+                            .attr("fill", colors(1))
+    Lcircle3 = svg.append("circle")
+                .attr("class","clegend2")
+              .attr("r", 4)
+              .attr("opacity", 0)
+              .attr("transform",
+                  "translate(" + (legendw-5) + " ," +
+                                 (legendh + 45) + ")")
+                            .attr('stroke','black')
+                            .attr('stroke-width',0)
+                            .attr("fill", colors(1))
+    Lcircle4 = svg.append("circle")
+                .attr("class","clegend3")
+              .attr("r", 4)
+              .attr("transform",
+                  "translate(" + (legendw-5) + " ," +
+                                 (legendh + 60) + ")")
+              .attr("opacity", 0)
+                            .attr('stroke','black')
+                            .attr('stroke-width',0)
+                            .attr("fill", colors(1))
+    Lcircle5 = svg.append("circle")
+                .attr("class","clegend4")
+              .attr("r", 4)
+              .attr("opacity", 0)
+              .attr("transform",
+                  "translate(" + (legendw-5) + " ," +
+                                 (legendh + 75) + ")")
+                            .attr('stroke','black')
+                            .attr('stroke-width',0)
+                            .attr("fill", colors(1))
+
+    Ltext1 = svg.append("text")
+          .attr("class", "legend0")
+          .attr("transform",
+                "translate(" + (legendw) + " ," +
+                               (legendh +20) + ")")
+          .attr("style", "font-size: 20")
+          .style("text-anchor", "left")
+          .text("Male");
+  Ltext2 = svg.append("text")
+          .attr("class", "legend1")
+          .attr("transform",
+                "translate(" + (legendw) + " ," +
+                               (legendh + 35) + ")")
+          .attr("style", "font-size: 20")
+          .style("text-anchor", "left")
+          .text("Female");
+  Ltext3 = svg.append("text")
+        .attr("class", "legend2")
+        .attr("transform",
+              "translate(" + (legendw) + " ," +
+                             (legendh + 50) + ")")
+        .attr("style", "font-size: 20")
+        .style("text-anchor", "left")
+        .text("");
+  Ltext4 = svg.append("text")
+        .attr("class", "legend3")
+        .attr("transform",
+              "translate(" + (legendw) + " ," +
+                             (legendh + 65) + ")")
+        .attr("style", "font-size: 20")
+        .style("text-anchor", "left")
+        .text("");
+  Ltext5 = svg.append("text")
+        .attr("class", "legend4")
+        .attr("transform",
+              "translate(" + (legendw) + " ," +
+                             (legendh + 80) + ")")
+        .attr("style", "font-size: 20")
+        .style("text-anchor", "left")
+        .text("");
+
+    radio_circulos = 3,
+    largo_lineas = 10;
+
+// seleccion de variables
+
+var body = d3.select('body')
+var selectData = [ { "text" : "Age" },
+                    { "text" : "Resting blood pressure (in mm Hg on admission to the hospital)" },
+                    { "text" : "Serum cholestoral in mg/dl"},
+                    { "text" : "Maximum heart rate achieved"},
+                    { "text" : "ST depression induced by exercise relative to rest"},
+                ]
+var selectCategorical = [ {"text" : "Sex" },
+                        {"text" : "Chest pain type" },
+                        { "text" : "Fasting blood sugar > 120 mg/dl (0 = false; 1 = true)"},
+                        { "text" : "Resting electrocardiographic results (0 = normal; 1 = abnormal; 2 = problem" },
+                        { "text" : "Exercise induced angina (0 = no; 1 = yes)" },
+                        { "text" : "Slope of the peak exercise ST segment (1 = upsloping; 2 = flat; 3=downsloping)" },
+                        { "text" : "Number of major vessels (0-3) colored by flourosopy " },
+                        { "text" : "Thal (3 = normal; 6 = fixed defect; 7 = reversable defect)" },
+                        { "text" : "diagnosis of heart disease" }
+
+                        ]
+
+var diccio = { "Age": "age",
+            "Sex": "sex",
+            "Resting blood pressure (in mm Hg on admission to the hospital)": "blood_pressure"  ,
+                "Serum cholestoral in mg/dl": "cholestoral",
+                "Maximum heart rate achieved": "heart_rate",
+                "ST depression induced by exercise relative to rest": "st_depression",
+            "Chest pain type": "chest_pain",
+            "Fasting blood sugar > 120 mg/dl (0 = false; 1 = true)": "blood_sugar",
+            "Resting electrocardiographic results (0 = normal; 1 = abnormal; 2 = problem": "electrocard" ,
+            "Exercise induced angina (0 = no; 1 = yes)": "exercise" ,
+            "Slope of the peak exercise ST segment (1 = upsloping; 2 = flat; 3=downsloping)": "slope_exercise" ,
+            "Number of major vessels (0-3) colored by flourosopy ": "number_vessels" ,
+            "Thal (3 = normal; 6 = fixed defect; 7 = reversable defect)": "thal" ,
+            "diagnosis of heart disease": "diagnosis" };
+var labels = { "age": "Age (Years)",
+                "blood_pressure" : "Pressure (mm Hg)",
+                "cholestoral" : "Cholestoral (mg/dl)",
+                "heart_rate": "Heart Rate (bpm)",
+                "st_depression": "ST depression (mm)"};
+var lagendic = {"chest_pain": {1: "Typical Angina", 2: "Atypical Angina", 3: "Non-Anginal Pain", 4: "Asymptomatic"},
+                "sex": {0: "Male", 1: "Female"},
+                "blood_sugar": {0: "False", 1: "True"},
+                "electrocard": {0: "Normal", 1: "Abnormal", 2: "Problem", 3: "Electrocard"},
+                "exercise": {0: "No", 1: "Yes"},
+                "slope_exercise": {1: "upsloping", 2: "Flat", 3: "Downsloping"},
+                "number_vessels": {0: "0", 1: "1", 2: "2", 3: "3"},
+                "thal" : {3: "Normal", 6: "Fixed defect", 7: "Reversable Defect"},
+                "diagnosis": {0: "0", 1: "1", 2: "2", 3: "3", 4: "4"}};
+
+
+d3.csv("data.csv").then(function(data){
+
+    data.forEach(function(d) {
+        d['age'] = +d['age']
+        d['sex'] = +d['sex']
+        d['chest_pain'] = +d['chest_pain']
+        d['heart_rate'] = +d['heart_rate']
+        d['blood_pressure'] = +d['blood_pressure']
+        d['cholestoral'] = +d['cholestoral']
+        d['blood_sugar'] = +d['blood_sugar']
+        d['electrocard'] = +d['electrocard']
+        d['exercise'] = +d['exercise']
+        d['st_depression'] = +d['st_depression']
+        d['slope_exercise'] = +d['slope_exercise']
+        d['number_vessels'] = +d['number_vessels']
+        d['thal'] = +d['thal']
+        d['diagnosis'] = +d['diagnosis']
+    });
+    var inputs = d3.select("#inputs")
+    inputs.append('br');
+
+    // Select X-axis Variable
+
+    var xInput = d3.select('#xSelect')
+        .on('change',xChange)
+    .selectAll('option')
+        .data(selectData)
+        .enter()
+    .append('option')
+        .attr('value', function (d) { return d.text })
+        .text(function (d) { return d.text ;});
+
+    inputs.append('br');
+    
+    var slider1 = d3.sliderHorizontal()
+    .min(20)
+    .max(100)
+    .width(300)
+    .ticks(5)
+    .default(50)
+    .on('onchange', function(cambio) {
+      var value = 
+      d3.selectAll(".derivadas")
+        .transition()
+            .duration(1000)
+            .attr("x1", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, cambio,  x, y);
+                    return (xScale(d[x]) - normalize(1, primera,10)[0]);
+                })
+                .attr("x2", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, cambio,  x, y);
+                    return (xScale(d[x]) + normalize(1, primera,10)[0]);
+                })
+                .attr("y1", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, cambio,  x, y);
+                    return (yScale(d[y]) - normalize(1, primera,10)[1]);
+                })
+                .attr("y2", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, cambio,  x, y);
+                    return (yScale(d[y]) + normalize(1, primera,10)[1]);
+                });
+    });
+
+    var group2 = d3.select("div#slider").append("svg")
+    .attr("width", 500)
+    .attr("height", 100)
+    .append("g")
+    .attr("transform", "translate(100,10)");
+
+  group2.call(slider1);
+
+    body.append('br');
+
+   // Select Y-axis Variable
+    var yInput = d3.select('#ySelect')
+        .on('change',yChange)
+    .selectAll('option')
+        .data(selectData)
+        .enter()
+    .append('option')
+        .attr('value', function (d) { return d.text })
+        .text(function (d) { return d.text ;});
+
+    inputs.append('br');
+
+    var dInput = d3.select('#dSelect')
+        .on('change',dChange)
+    .selectAll('option')
+        .data(selectData)
+        .enter()
+    .append('option')
+        .attr('value', function (d) { return d.text })
+        .text(function (d) { return d.text ;});
+
+    inputs.append('br');
+
+    // Select categorical variable
+    var cInput = d3.select('#cSelect')
+        .on('change',cChange)
+    .selectAll('option')
+        .data(selectCategorical)
+        .enter()
+    .append('option')
+        .attr('value', function (d) { return d.text })
+        .text(function (d) { return d.text ;})
+        body.append('br');
+
+    xScale
+        .domain([d3.min(data, function(d) {return d['age'] * 0.95;}), d3.max(data, function(d) {return d['age'] * 1.05;})]);
+    yScale
+        .domain([0, d3.max(data, function(d) {return d['cholestoral'] * 1.1;})]);
+    svg.select(".x-axis").transition()
+        .duration(1000)
+        .call(xGen);
+    svg.select(".y-axis").transition()
+        .duration(1000)
+        .call(yGen);
+
+    var x = "age",
+        y = "cholestoral",
+        color = "sex";
+
+    var lines = svg.selectAll(".line")
+                        .data(data);
+
+    var new_lines = lines
+                        .enter().append("line")
+                                .attr("class", "derivadas")
+                                .attr("stroke", function(d){
+                                            return colors(d['sex']);
+                                        })
+                                .attr("stroke-width", 1)
+                                .merge(lines)
+                                .transition()
+                                    .duration(1000)
+                                        .attr("x1", function(d) {
+                                            let primera = primera_derivada(d["age"], d["cholestoral"], data, 50,  "age", "cholestoral");
+                                            return (xScale(d['age']) - normalize(1, primera,10)[0]);
+                                        })
+                                        .attr("x2", function(d) {
+                                            let primera = primera_derivada(d["age"], d["cholestoral"], data, 50,  "age", "cholestoral");
+                                            return xScale(d['age']) + normalize(1, primera,10)[0];
+                                        })
+                                        .attr("y1", function(d) {
+                                            let primera = primera_derivada(d["age"], d["cholestoral"], data, 50,  "age", "cholestoral");
+                                            return yScale(d['cholestoral']) - normalize(1, primera,10)[1];
+                                        })
+                                        .attr("y2", function(d) {
+                                            let primera = primera_derivada(d["age"], d["cholestoral"], data, 50,  "age", "cholestoral");
+                                            const ejey = 10*Math.sin(Math.atan(primera));
+                                            return yScale(d['cholestoral']) + normalize(1, primera,10)[1];
+                                        });
+
+    var hacerlineas = d3.line()
+                        .x(function(d) { return xScale(d.x);})
+                        .y(function(d) { return yScale(d.y);});
+
+    function hacerstreamlines()
+    {
+        d3.selectAll(".paths").remove()
+        for(let i = 0; i < 22; i++)
+        {
+            svg.append("path")
+                .datum(streamline(d3.mean(data, function(d) {return d[x];}),
+                                  d3.mean(data, function(d) {return d[y];}) - d3.deviation(data, function(d) {return d[y];})*0.2*i,
+                                  data, 200, x, y,
+                                  d3.min(data, function(d) {return d[x] * 0.995;}),
+                                  d3.max(data, function(d) {return d[x] * 1.05;}),
+                                  d3.max(data, function(d) {return d[y] * 1.1;}),
+                                  100))
+                .attr("d", hacerlineas)
+                .attr("stroke", "orange")
+                .attr("stroke-width", 1)
+                .attr("fill", "none")
+                .attr("class", "paths")
+                .attr("opacity", 0.5)
+                .on("mouseover", function(d) {if (lineas == 1){
+                    d3.select(d3.event.target)
+                        .attr("stroke-width", 3)
+                        .attr("stroke", "#0B186F")
+                        .attr("opacity", 0.9);
+                    d3.selectAll(".datacircle").transition()
+                        .attr('r',radio_circulos)
+                        .attr('stroke-width',0);
+                    d3.selectAll(".datacircle").filter(a => {
+                            for(let i = 0; i < d.length; i++)
+                            {
+                                let r = ((d[i].x - a[x])**2+(d[i].y - a[y])**2)**(1/2);
+                                if(r<=15) {
+                                    return true;
+                                };
+                            };
+                        })
+                        .transition()
+                        .duration(500)
+                        .attr("fill", "#0B186F");
+                }})
+                .on("mouseout", function(d) {
+                    d3.select(d3.event.target)
+                        .attr("stroke-width", 1)
+                        .attr("stroke", "orange")
+                        .attr("opacity", 0.5);
+                    d3.selectAll(".datacircle").transition()
+                        .duration(1000)
+                        .attr("fill", function(a) {return colors(a[color]);});
+                });
+        };
+
+        for(let i = -1; i > -22; i--)
+        {
+            svg.append("path")
+                .datum(streamline(d3.mean(data, function(d) {return d[x];}),
+                                  d3.mean(data, function(d) {return d[y];}) - d3.deviation(data, function(d) {return d[y];})*0.25*i,
+                                  data, 200, x, y,
+                                  d3.min(data, function(d) {return d[x] *0.995;}),
+                                  d3.max(data, function(d) {return d[x] * 1.05;}),
+                                  d3.max(data, function(d) {return d[y] * 1.1;}),
+                                  100))
+                .attr("d", hacerlineas)
+                .attr("stroke", "orange")
+                .attr("stroke-width", 1)
+                .attr("fill", "none")
+                .attr("class", "paths")
+                .attr("opacity", 0.5)
+                .on("mouseover", function(d) {
+                    d3.select(d3.event.target)
+                        .attr("stroke-width", 3)
+                        .attr("stroke", "#0B186F")
+                        .attr("opacity", 0.9);
+                    d3.selectAll(".datacircle").filter(a => {
+                            for(let i = 0; i < d.length; i++)
+                            {
+                                let r = ((d[i].x - a[x])**2+(d[i].y - a[y])**2)**(1/2);
+                                if(r<=15) {
+                                    return true;
+                                };
+                            };
+                        })
+                        .transition()
+                        .duration(500)
+                        .attr("fill", "#0B186F");
+                })
+                .on("mouseout", function(d) {
+                    d3.select(d3.event.target)
+                        .attr("stroke-width", 1)
+                        .attr("stroke", "orange")
+                        .attr("opacity", 0.5);
+                    d3.selectAll(".datacircle").transition()
+                        .duration(1000)
+                        .attr("fill", function(a) {return colors(a[color]);});
+                });
+        };
+    d3.selectAll(".paths").style("opacity", 0)
+    lineas = 0
+    };
+
+    hacerstreamlines();
+
+    var exit_lines = lines
+                        .exit()
+                        .transition()
+                        .duration(500)
+                        .style('opacity', 0)
+                        .remove();
+
+    var circles = svg.selectAll(".datacircle")
+                     .data(data);
+
+
+    var new_circles = circles
+                        .enter().append("circle")
+                                .attr("class", "datacircle")
+                                .attr("r", radio_circulos)
+                                .attr('stroke','black')
+                                .attr('stroke-width',0)
+                                .attr('opacity', 0.8)
+                                .on("mouseover", function(d) {
+                                            d3.select(d3.event.target)
+                                                .transition()
+                                                .duration(500)
+                                                .attr("r", 10)
+                                                .attr('stroke-width',3);
+                                            tooltip.transition()
+                                                    .duration(300)
+                                                    .style("opacity", 1);
+                                            tooltip
+                                                .style("left", (d3.event.pageX + 10) + "px")
+                                                .style("top", (d3.event.pageY + 10) + "px")
+                                                .html(x + ": " + d[x] + "<br>" + y + ": " + d[y]);
+                                            })
+                                .on('mouseout', function () {
+                                            d3.select(d3.event.target)
+                                                .transition()
+                                                .duration(500)
+                                                .attr('r',radio_circulos)
+                                                .attr('stroke-width',0);
+                                            tooltip.transition()
+                                                .duration(300)
+                                                .style("opacity", 0);
+                                            })
+                                .merge(circles)
+                                .transition()
+                                    .duration(1000)
+                                        .attr("cx", function(d) {
+                                            return xScale(d['age']);
+                                        })
+                                        .attr("cy", function(d) {
+                                            return yScale(d['cholestoral']);
+                                        })
+                                        .attr("fill", function(d) {
+                                            return colors(d['sex']);
+                                        });
+
+
+      var exit_bars = bars
+                          .exit()
+                              .transition()
+                                  .duration(500)
+                                  .attr("opacity", 0)
+                                  .remove();
+
+
+    function xChange(radius = 50) {
+        var value = diccio[this.value]
+        console.log(value)
+        x = value;
+        redrawTextX(labels[x]);
+        texto = labels[x];
+        d3.selectAll("LabelX").text(texto);
+        xScale
+            .domain([d3.min(data, function(d) {return d[x] * 0.95;}), d3.max(data, function(d) {return d[x] * 1.05;})]);
+            svg.select(".x-axis").transition()
+                .duration(1000)
+                .call(xGen);
+        d3.selectAll(".datacircle").transition()
+            .duration(1000)
+            .attr("cx", function(d) {
+                return xScale(d[x]);
+            });
+        d3.selectAll(".derivadas")
+            .transition()
+                .duration(1000)
+                .attr("x1", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, radius,  x, y);
+                    return (xScale(d[x]) - normalize(1, primera,10)[0]);
+                })
+                .attr("x2", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, radius,  x, y);
+                    return (xScale(d[x]) + normalize(1, primera,10)[0]);
+                })
+                .attr("y1", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, radius,  x, y);
+                    return (yScale(d[y]) - normalize(1, primera,10)[1]);
+                })
+                .attr("y2", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, radius,  x, y);
+                    return (yScale(d[y]) + normalize(1, primera,10)[1]);
+                })
+        hacerstreamlines()
+        slider1.value(50);
+    };
+
+    function yChange(radius = 50) {
+        var value = diccio[this.value]
+        y = value
+        redrawTextY(labels[y])
+        yScale
+            .domain([0, d3.max(data, function(d) {return d[y] * 1.1;})]);
+        svg.select(".y-axis").transition()
+            .duration(1000)
+            .call(yGen);
+        d3.selectAll(".datacircle").transition()
+            .duration(1000)
+            .attr("cy", function(d) {
+                return yScale(d[y]);
+            });
+        d3.selectAll(".derivadas")
+            .transition()
+                .duration(1000)
+                .attr("x1", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, radius,  x, y);
+                    return (xScale(d[x]) - normalize(1, primera,10)[0]);
+                })
+                .attr("x2", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, radius,  x, y);
+                    return (xScale(d[x]) + normalize(1, primera,10)[0]);
+                })
+                .attr("y1", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, radius,  x, y);
+                    return (yScale(d[y]) - normalize(1, primera,10)[1]);
+                })
+                .attr("y2", function(d) {
+                    let primera = primera_derivada(d[x], d[y], data, radius,  x, y);
+                    return (yScale(d[y]) + normalize(1, primera,10)[1]);
+                })
+        hacerstreamlines()
+        slider1.value(50);
+    };
+
+    function cChange() {
+        color = diccio[this.value]
+        redrawLegend(color)
+            d3.selectAll('.datacircle')
+            .transition()
+            .duration(1000)
+            .attr('fill',function (d) { return colors(d[color]) })
+
+            d3.selectAll(".derivadas")
+            .transition()
+            .duration(1000)
+            .attr('stroke',function (d) { return colors(d[color]) })
+            d3.selectAll('datacircle')
+            .transition()
+            .duration(1000)
+            .attr('fill',function (d) { return colors(d[color]) })
+    };
+    function redrawTextX(texto) {
+        Xlabel
+        .transition()
+        .duration(1000)
+        .style("opacity", 0)
+        .transition().duration(500)
+        .style("opacity", 1)
+        .text(texto)
+    };
+
+    function redrawTextY(texto) {
+        Ylabel
+        .transition()
+        .duration(1000)
+        .style("opacity", 0)
+        .transition().duration(500)
+        .style("opacity", 1)
+        .text(texto)
+    };
+
+    function redrawLegend(value) {
+        dict = lagendic[value]
+        i = 0
+        for (t in dict) {
+            d3.select('.clegend' + i)
+            .transition()
+            .duration(500)
+            .attr("opacity", 0)
+            .attr('fill',function (d) { return colors(t) })
+            .transition()
+            .duration(500)
+            .attr("opacity", 1);
+
+            d3.select(".legend" + i)
+            .attr("opacity", 0)
+            .text(dict[t])
+            .transition()
+            .duration(500)
+            .attr("opacity", 1)
+            i++;
+        }
+        while(i < 6){
+            d3.select('.clegend' + i)
+            .transition()
+            .duration(1000)
+            .attr("opacity", 0)
+            ;
+            d3.select(".legend" + i)
+            .transition()
+            .duration(1000)
+            .attr("opacity", 0)
+            i++
+        }}
+
+    function dChange(radius = 50) {
+        var value = diccio[this.value]
+        d3.selectAll(".derivadas")
+        .transition()
+            .duration(1000)
+            .attr("x1", function(d) {
+                    let primera = primera_derivada(d[value], d[y], data, radius,  value, y);
+                    return (xScale(d[x]) - normalize(1, primera,10)[0]);
+                })
+                .attr("x2", function(d) {
+                    let primera = primera_derivada(d[value], d[y], data, radius,  value, y);
+                    return (xScale(d[x]) + normalize(1, primera,10)[0]);
+                })
+                .attr("y1", function(d) {
+                    let primera = primera_derivada(d[value], d[y], data, radius,  value, y);
+                    return (yScale(d[y]) - normalize(1, primera,10)[1]);
+                })
+                .attr("y2", function(d) {
+                    let primera = primera_derivada(d[value], d[y], data, radius,  value, y);
+                    return (yScale(d[y]) + normalize(1, primera,10)[1]);
+                })
+    }
+    ;
+})
+var lineas = 0
+function cambiarlineas() {
+  if (lineas == 1) {
+    d3.selectAll(".paths").style("opacity", 0),
+    lineas = 0
+  }
+  else {
+    d3.selectAll(".paths").style("opacity", 0.5),
+    lineas = 1
+  }
+}
+
+</script>
+    <!-- /.container -->
+
+    <!-- Bootstrap core JavaScript -->
+
+  </body>
+
+</html>
+
